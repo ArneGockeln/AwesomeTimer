@@ -10,7 +10,7 @@ import Foundation
 import Combine
 
 /// A timer that can be used for second countdowns and count-ups, as well as millisecond count-ups.
-@available(macOS 10.15, *)
+@available(macOS 10.15, iOS 13, *)
 final class AwesomeTimer {
     // The awesome timer supports countdown and countup mode
     enum TimerMode {
