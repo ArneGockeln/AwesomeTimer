@@ -1,2 +1,2 @@
 # AwesomeTimer
-Swift Timer that supports Countdown, Count Up in Seconds and Count Up in Milliseconds.
+A timer that can be used for second countdowns and count-ups, as well as millisecond count-ups. Written in Swift.
