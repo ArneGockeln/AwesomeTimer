@@ -9,30 +9,24 @@
 import Foundation
 import Combine
 
-/// A timer that can be used for second countdowns and count-ups, as well as millisecond count-ups.
+/// A timer that can be used for countdowns and count-ups with millisecond precision.
 @available(macOS 10.15, iOS 13, *)
 final class AwesomeTimer {
     // The awesome timer supports countdown and countup mode
     enum TimerMode {
-        case countdown, countup, countupMillisecond
+        case countdown,
+             countup
     }
     
     // Holds the current mode the timer is working on
-    private(set) var mode: TimerMode = .countdown
+    private(set) var mode: TimerMode = .countup
     
-    // callback that runs every second. In countdown mode the Int parameter representes the remaining seconds. In countup mode the elapsed seconds
-    // (Seconds:Int)
-    private(set) var onSecond: ((Int) -> Void)?
-    
-    // callback that runs every millisecond. Only in countupMillisecond mode!
+    // callback that runs every millisecond.
     // (Elapsed Millisconds: Double)
-    private(set) var onMillisecond: ((Double) -> Void)?
+    private(set) var onTick: ((Double) -> Void)?
     
     // current milliseconds value. will be reset every second
     private(set) var milliseconds: Double = 0
-    
-    // In countdown mode the starting value to countdown, in countup mode the elapsed seconds
-    private(set) var durationSeconds: Int = 0
     
     // Holds the published timer
     private(set) var cancellable: AnyCancellable?
@@ -44,82 +38,77 @@ final class AwesomeTimer {
         }
     }
     
+    // init
     init() {
-        self.durationSeconds = 0
         self.milliseconds = 0
     }
     
-    // start a countup with callback every second
-    func start(onSecond: @escaping (Int) -> Void) {
-        self.durationSeconds = 0
-        self.onSecond = onSecond
-        self.mode = .countup
-        
-        self.startTimer()
+    // take a snapshot of the elapsed time without stoppping
+    func snapshot() -> Double {
+        return self.milliseconds
     }
     
     // start a countup with callback every millisecond
-    func startMillisecond(onMillisecond: @escaping (Double) -> Void) {
-        self.durationSeconds = 0
-        self.onMillisecond = onMillisecond
-        self.mode = .countupMillisecond
+    func start(onTick: @escaping (Double) -> Void) {
+        self.onTick = onTick
+        self.mode = .countup
+        self.milliseconds = 0
         
         self.startTimer()
     }
     
-    // start a countdown with a duration and callback every second
-    func startCountdown(seconds duration: Int, onSecond: @escaping(Int) -> Void) {
-        self.durationSeconds = duration
-        self.onSecond = onSecond
+    // start a countdown with millisecond precision, duration and callback on every millisecond tick
+    func startCountdown(seconds duration: Double, onTick: @escaping (Double) -> Void) {
+        self.onTick = onTick
         self.mode = .countdown
+        self.milliseconds = duration
         
         self.startTimer()
     }
     
     // init and publish the timer
     private func startTimer() {
-        self.milliseconds = 0
-            
         self.cancellable = Timer.publish(every: 0.01, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                self?.milliseconds += 0.01
-                self?.onTick()
+                if self?.mode == .countdown {
+                    self?.milliseconds -= 0.01
+                } else {
+                    self?.milliseconds += 0.01
+                }
+                self?.processTick()
             }
     }
     
     // the timer callback called every millisecond
-    private func onTick() {
+    private func processTick() {
         // run callback every millisecond
-        self.onMillisecond?(self.milliseconds)
-        
-        // is a second ago
-        guard self.mode != .countupMillisecond, self.milliseconds >= 1.0 else { return }
-        
-        // reset ms counter
-        self.milliseconds = 0
-        
-        switch self.mode {
-            case .countdown:
-                // decrease duration
-                self.durationSeconds -= 1
-                if self.durationSeconds <= 0 {
-                    self.stop()
-                }
+        if self.mode == .countup || self.mode == .countdown {
+            // call the callback
+            self.onTick?(self.milliseconds)
             
-                // countup
-            default:
-                // increase duration
-                self.durationSeconds += 1
+            // stop when the millisecond countdown is finished
+            if self.mode == .countdown && self.milliseconds <= 0 {
+                self.stop()
+            }
+            
+            return
         }
-        
-        // call the callback
-        self.onSecond?(self.durationSeconds)
     }
     
     // stops the timer
     func stop() {
         self.cancellable?.cancel()
         self.cancellable = nil
+    }
+    
+    // pause the timer
+    func pause() {
+        self.stop()
+    }
+    
+    // resume the timer
+    func resume() {
+        self.startTimer()
     }
 }
